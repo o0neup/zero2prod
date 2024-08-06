@@ -1,4 +1,6 @@
+use sqlx::{Connection, PgConnection};
 use std::net::TcpListener;
+use zero2prod::configuration::get_configuration;
 
 #[tokio_macros::test]
 async fn health_check_works() {
@@ -19,6 +21,11 @@ async fn health_check_works() {
 #[tokio_macros::test]
 async fn subscribe_returns_200_for_valid_form_data() {
     let app_address = spawn_app();
+    let configuration = get_configuration().expect("Failed to read configuration.yaml");
+    let connection_string = configuration.database.connection_string();
+    let mut connection = PgConnection::connect(&connection_string)
+        .await
+        .expect("Failed to connect to psql");
     let client = reqwest::Client::new();
 
     let body = "name=kotleta&email=2hcompany%40gmail.com";
@@ -31,6 +38,13 @@ async fn subscribe_returns_200_for_valid_form_data() {
         .expect("Failed to execute request.");
 
     assert_eq!(200, response.status().as_u16());
+    let saved = sqlx::query!("SELECT email, name FROM subscriptions")
+        .fetch_one(&mut connection)
+        .await
+        .expect("Failed to fetch saved subscription");
+
+    assert_eq!(saved.email, "2hcompany@gmail.com");
+    assert_eq!(saved.name, "kotleta");
 }
 
 #[tokio_macros::test]
