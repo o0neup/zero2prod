@@ -10,7 +10,11 @@ async fn main() -> Result<(), std::io::Error> {
         .unwrap_or_else(|_| panic!("Failed to bind to port {}.", settings.app_port));
     let pool = PgPool::connect(&settings.database.connection_string())
         .await
-        .unwrap_or_else(|_| panic!("Failed to connect to psql at {}",
-            &settings.database.connection_string()));
+        .unwrap_or_else(|_| {
+            panic!(
+                "Failed to connect to psql at {}",
+                &settings.database.connection_string()
+            )
+        });
     run(listener, pool)?.await
 }
