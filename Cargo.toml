@@ -20,6 +20,7 @@ serde = { version = "1", features = ["derive"] }
 tokio = { version = "1", features = ["rt", "rt-multi-thread"] }
 tokio-macros = "2.2.0"
 uuid = { version = "1.10.0", features = ["v4"] }
+yaml-rust2 = "0.8.1"
 
 [dependencies.sqlx]
 version = "0.7"
