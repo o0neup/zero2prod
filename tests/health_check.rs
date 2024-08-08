@@ -1,10 +1,24 @@
+use once_cell::sync::Lazy;
 use rand::{distributions::Alphanumeric, Rng};
 use sqlx::{Connection, Executor, PgConnection, PgPool};
 use std::net::TcpListener;
 use zero2prod::{
     configuration::{get_configuration, DatabaseSettings},
     startup::run,
+    telemetry::{get_subscriber, init_subscriber},
 };
+
+static TRACING: Lazy<()> = Lazy::new(|| {
+    let name = "IT".into();
+    let env_filter = "info".into();
+    if std::env::var("TEST_LOG").is_ok() {
+        let subscriber = get_subscriber(name, env_filter, std::io::stdout);
+        init_subscriber(subscriber);
+    } else {
+        let subscriber = get_subscriber(name, env_filter, std::io::sink);
+        init_subscriber(subscriber);
+    }
+});
 
 #[derive(Debug)]
 pub struct TestApp {
@@ -81,6 +95,7 @@ async fn subscribe_returns_400_when_data_is_missing() {
 }
 
 async fn spawn_app() -> TestApp {
+    Lazy::force(&TRACING);
     let listener = TcpListener::bind("127.0.0.1:0").expect("Failed to bind random port.");
     let port = listener.local_addr().unwrap().port();
     let mut configuration = get_configuration().expect("Failed to fetch configuration!");
