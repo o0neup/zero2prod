@@ -1,6 +1,16 @@
 name: zero2prod
 
-on: [push, pull_request]
+on:
+  push:
+    branches:
+      - main
+  pull_request:
+    types:
+      - opened
+      - synchronize
+      - reopened
+    branches:
+      - main
 
 env:
   CARGO_TERM_COLOR: always
