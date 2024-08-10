@@ -10,10 +10,17 @@ async fn main() -> Result<(), std::io::Error> {
     telemetry::init_subscriber(subscriber);
 
     let settings = get_configuration().expect("Failed to read configuration.yaml");
-    let listener = TcpListener::bind(&format!("127.0.0.1:{}", settings.app_port))
-        .unwrap_or_else(|_| panic!("Failed to bind to port {}.", settings.app_port));
-    let pool = PgPool::connect(settings.database.connection_string().expose_secret())
-        .await
+    let listener = TcpListener::bind(&format!(
+        "{}:{}",
+        settings.application.host, settings.application.port
+    ))
+    .unwrap_or_else(|_| {
+        panic!(
+            "Failed to bind to address {}:{}.",
+            settings.application.host, settings.application.port
+        )
+    });
+    let pool = PgPool::connect_lazy(settings.database.connection_string().expose_secret())
         .unwrap_or_else(|_| {
             panic!(
                 "Failed to connect to psql at {}",
