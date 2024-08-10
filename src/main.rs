@@ -20,5 +20,9 @@ async fn main() -> Result<(), std::io::Error> {
         )
     });
     let pool = PgPoolOptions::new().connect_lazy_with(settings.database_url.0);
+    sqlx::migrate!("./migrations")
+        .run(&pool)
+        .await
+        .unwrap_or_else(|e| panic!("Failed to apply migrations: {}", e));
     run(listener, pool)?.await
 }
