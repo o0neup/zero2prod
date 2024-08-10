@@ -1,7 +1,6 @@
 use std::net::TcpListener;
 
-use secrecy::ExposeSecret;
-use sqlx::PgPool;
+use sqlx::postgres::PgPoolOptions;
 use zero2prod::{configuration::get_configuration, startup::run, telemetry};
 
 #[tokio_macros::main]
@@ -20,12 +19,6 @@ async fn main() -> Result<(), std::io::Error> {
             settings.application.host, settings.application.port
         )
     });
-    let pool = PgPool::connect_lazy(settings.database.connection_string().expose_secret())
-        .unwrap_or_else(|_| {
-            panic!(
-                "Failed to connect to psql at {}",
-                &settings.database.connection_string().expose_secret()
-            )
-        });
+    let pool = PgPoolOptions::new().connect_lazy_with(settings.database_url.0);
     run(listener, pool)?.await
 }

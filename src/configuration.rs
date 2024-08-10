@@ -1,23 +1,40 @@
-use secrecy::{ExposeSecret, Secret};
+use std::str::FromStr;
 
-#[derive(serde::Deserialize)]
-pub struct DatabaseSettings {
-    pub username: String,
-    pub password: Secret<String>,
-    pub port: u16,
-    pub host: String,
-    pub database_name: String,
-}
+use serde::{de, Deserialize};
+use serde_aux::field_attributes::deserialize_number_from_string;
+use sqlx::postgres::PgConnectOptions;
 
-#[derive(serde::Deserialize)]
+#[derive(Debug, serde::Deserialize)]
 pub struct ApplicationSettings {
     pub host: String,
+    #[serde(deserialize_with = "deserialize_number_from_string")]
     pub port: u16,
 }
 
-#[derive(serde::Deserialize)]
+#[derive(Debug)]
+pub struct DbOptions(pub PgConnectOptions);
+
+impl TryFrom<&str> for DbOptions {
+    type Error = sqlx::Error;
+
+    fn try_from(value: &str) -> Result<Self, Self::Error> {
+        PgConnectOptions::from_str(value).map(DbOptions)
+    }
+}
+
+impl<'de> Deserialize<'de> for DbOptions {
+    fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
+    where
+        D: serde::Deserializer<'de>,
+    {
+        let s = String::deserialize(deserializer)?;
+        DbOptions::try_from(s.as_str()).map_err(de::Error::custom)
+    }
+}
+
+#[derive(Debug, serde::Deserialize)]
 pub struct Settings {
-    pub database: DatabaseSettings,
+    pub database_url: DbOptions,
     pub application: ApplicationSettings,
 }
 
@@ -67,29 +84,7 @@ pub fn get_configuration() -> Result<Settings, config::ConfigError> {
         .add_source(config::File::from(
             configuration_directory.join(environment_filename),
         ))
+        .add_source(config::Environment::default().separator("__"))
         .build()?;
     settings.try_deserialize::<Settings>()
-}
-
-impl DatabaseSettings {
-    pub fn connection_string(&self) -> Secret<String> {
-        Secret::new(format!(
-            "postgres://{}:{}@{}:{}/{}",
-            self.username,
-            self.password.expose_secret(),
-            self.host,
-            self.port,
-            self.database_name
-        ))
-    }
-
-    pub fn connection_string_without_db(&self) -> Secret<String> {
-        Secret::new(format!(
-            "postgres://{}:{}@{}:{}",
-            self.username,
-            self.password.expose_secret(),
-            self.host,
-            self.port
-        ))
-    }
 }

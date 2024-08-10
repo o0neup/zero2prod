@@ -1,8 +1,3 @@
 application:
   port: 8000
-database:
-  host: "0.0.0.0"
-  port: 5432
-  username: "postgres"
-  password: "postgres"
-  database_name: "newsletter"
+database_url: "postgres://postgres:postgres@0.0.0.0:5432/newsletter"
