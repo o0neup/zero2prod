@@ -70,6 +70,36 @@ async fn subscribe_returns_200_for_valid_form_data() {
 }
 
 #[tokio_macros::test]
+async fn subscribe_returns_400_for_invalid_form_data() {
+    let test_app = spawn_app().await;
+    let client = reqwest::Client::new();
+
+    let test_cases = vec![
+        ("name=[kotleta]&email=2hcompany%40gmail.com", "invalid name"),
+        (
+            "name=DROP TABLE subscriptions;&email=2hcompany%40gmail.com",
+            "invalid name",
+        ),
+    ];
+    for (body, _error) in test_cases {
+        let response = client
+            .post(&format!("http://{}/subscriptions", &test_app.address))
+            .header("Content-Type", "application/x-www-form-urlencoded")
+            .body(body)
+            .send()
+            .await
+            .expect("Failed to execute request.");
+
+        assert_eq!(
+            400,
+            response.status().as_u16(),
+            "The API didn't fail with 400 Bad Request when the payload was {}",
+            body
+        );
+    }
+}
+
+#[tokio_macros::test]
 async fn subscribe_returns_400_when_data_is_missing() {
     let test_app = spawn_app().await;
     let client = reqwest::Client::new();
