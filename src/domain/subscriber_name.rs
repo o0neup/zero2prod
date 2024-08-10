@@ -19,20 +19,8 @@ impl SubscriberName {
     }
 }
 
-impl SubscriberName {
-    pub fn inner_ref(&self) -> &str {
-        &self.0
-    }
-}
-
 impl AsRef<str> for SubscriberName {
     fn as_ref(&self) -> &str {
         &self.0
     }
-}
-
-#[derive(Debug)]
-pub struct NewSubscriber {
-    pub email: String,
-    pub name: SubscriberName,
 }
