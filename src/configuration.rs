@@ -1,49 +1,90 @@
-use secrecy::{ExposeSecret, Secret};
+use std::str::FromStr;
 
-#[derive(serde::Deserialize)]
-pub struct DatabaseSettings {
-    pub username: String,
-    pub password: Secret<String>,
-    pub port: u16,
+use serde::{de, Deserialize};
+use serde_aux::field_attributes::deserialize_number_from_string;
+use sqlx::postgres::PgConnectOptions;
+
+#[derive(Debug, serde::Deserialize)]
+pub struct ApplicationSettings {
     pub host: String,
-    pub database_name: String,
+    #[serde(deserialize_with = "deserialize_number_from_string")]
+    pub port: u16,
 }
 
-#[derive(serde::Deserialize)]
+#[derive(Debug)]
+pub struct DbOptions(pub PgConnectOptions);
+
+impl TryFrom<&str> for DbOptions {
+    type Error = sqlx::Error;
+
+    fn try_from(value: &str) -> Result<Self, Self::Error> {
+        PgConnectOptions::from_str(value).map(DbOptions)
+    }
+}
+
+impl<'de> Deserialize<'de> for DbOptions {
+    fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
+    where
+        D: serde::Deserializer<'de>,
+    {
+        let s = String::deserialize(deserializer)?;
+        DbOptions::try_from(s.as_str()).map_err(de::Error::custom)
+    }
+}
+
+#[derive(Debug, serde::Deserialize)]
 pub struct Settings {
-    pub database: DatabaseSettings,
-    pub app_port: u16,
+    pub database_url: DbOptions,
+    pub application: ApplicationSettings,
+}
+
+pub enum Environment {
+    Local,
+    Production,
+}
+
+impl Environment {
+    pub fn as_str(&self) -> &'static str {
+        match self {
+            Environment::Local => "local",
+            Environment::Production => "production",
+        }
+    }
+}
+
+impl TryFrom<String> for Environment {
+    type Error = String;
+
+    fn try_from(value: String) -> Result<Self, Self::Error> {
+        match value.to_lowercase().as_str() {
+            "local" => Ok(Environment::Local),
+            "production" => Ok(Environment::Production),
+            other => Err(format!(
+                "{} is not a supported environment. Use 'local' or 'production'.",
+                other
+            )),
+        }
+    }
 }
 
 pub fn get_configuration() -> Result<Settings, config::ConfigError> {
+    let base_path = std::env::current_dir().expect("Failed to determine current dir");
+    let configuration_directory = base_path.join("configuration");
+
+    let environment: Environment = std::env::var("APP_ENVIRONMENT")
+        .unwrap_or_else(|_| "local".into())
+        .try_into()
+        .expect("Failed to parse APP_ENVIRONMENT");
+
+    let environment_filename = format!("{}.yaml", environment.as_str());
     let settings = config::Config::builder()
-        .add_source(config::File::new(
-            "configuration.yaml",
-            config::FileFormat::Yaml,
+        .add_source(config::File::from(
+            configuration_directory.join("base.yaml"),
         ))
+        .add_source(config::File::from(
+            configuration_directory.join(environment_filename),
+        ))
+        .add_source(config::Environment::default().separator("__"))
         .build()?;
     settings.try_deserialize::<Settings>()
-}
-
-impl DatabaseSettings {
-    pub fn connection_string(&self) -> Secret<String> {
-        Secret::new(format!(
-            "postgres://{}:{}@{}:{}/{}",
-            self.username,
-            self.password.expose_secret(),
-            self.host,
-            self.port,
-            self.database_name
-        ))
-    }
-
-    pub fn connection_string_without_db(&self) -> Secret<String> {
-        Secret::new(format!(
-            "postgres://{}:{}@{}:{}",
-            self.username,
-            self.password.expose_secret(),
-            self.host,
-            self.port
-        ))
-    }
 }

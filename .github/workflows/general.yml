@@ -1,11 +1,22 @@
 name: zero2prod
 
-on: [push, pull_request]
+on:
+  push:
+    branches:
+      - main
+  pull_request:
+    types:
+      - opened
+      - synchronize
+      - reopened
+    branches:
+      - main
 
 env:
   CARGO_TERM_COLOR: always
   SQLX_VERSION: 0.7.1
   SQLX_FEATURES: "rustls,postgres"
+  DATABASE_URL: postgres://postgres:postgres@localhost:5432/newsletter
 
 # A workflow run is made up of one or more jobs, which run in parallel by default
 # Each job runs in a runner environment specified by runs-on
@@ -25,8 +36,8 @@ jobs:
         # Environment variables scoped only for the `postgres` element
         env:
           POSTGRES_USER: postgres
-          POSTGRES_PASSWORD: password
-          POSTGRES_DB: postgres
+          POSTGRES_PASSWORD: postgres
+          POSTGRES_DB: newsletter
         # When you map ports using the ports keyword, GitHub uses the --publish command to publish the container’s ports to the Docker host
         # Opens tcp port 5432 on the host and service container
         ports:
@@ -67,6 +78,9 @@ jobs:
       - name: Migrate database
         run: SKIP_DOCKER=true ./scripts/init_db.sh
 
+      - name: Prepare SQLx
+        run: cargo sqlx prepare --workspace --check
+
       - name: Run tests
         run: cargo test
 
@@ -92,8 +106,8 @@ jobs:
         image: postgres:14
         env:
           POSTGRES_USER: postgres
-          POSTGRES_PASSWORD: password
-          POSTGRES_DB: postgres
+          POSTGRES_PASSWORD: postgres
+          POSTGRES_DB: newsletter
         ports:
           - 5432:5432
     steps:
@@ -126,8 +140,8 @@ jobs:
         image: postgres:14
         env:
           POSTGRES_USER: postgres
-          POSTGRES_PASSWORD: password
-          POSTGRES_DB: postgres
+          POSTGRES_PASSWORD: postgres
+          POSTGRES_DB: newsletter
         ports:
           - 5432:5432
     steps:

@@ -1,10 +1,12 @@
 use once_cell::sync::Lazy;
 use rand::{distributions::Alphanumeric, Rng};
-use secrecy::ExposeSecret;
-use sqlx::{Connection, Executor, PgConnection, PgPool};
+use sqlx::{
+    postgres::{PgConnectOptions, PgPoolOptions},
+    Connection, Executor, PgConnection, PgPool,
+};
 use std::net::TcpListener;
 use zero2prod::{
-    configuration::{get_configuration, DatabaseSettings},
+    configuration::get_configuration,
     startup::run,
     telemetry::{get_subscriber, init_subscriber},
 };
@@ -99,14 +101,15 @@ async fn spawn_app() -> TestApp {
     Lazy::force(&TRACING);
     let listener = TcpListener::bind("127.0.0.1:0").expect("Failed to bind random port.");
     let port = listener.local_addr().unwrap().port();
-    let mut configuration = get_configuration().expect("Failed to fetch configuration!");
-    configuration.database.database_name = rand::thread_rng()
+    let configuration = get_configuration().expect("Failed to fetch configuration!");
+    let test_db_name = rand::thread_rng()
         .sample_iter(&Alphanumeric)
         .take(10)
         .map(char::from)
         .collect::<String>()
         .to_lowercase();
-    let pool = configure_database(&configuration.database).await;
+    let options_for_test = configuration.database_url.0.database(&test_db_name);
+    let pool = configure_database(options_for_test).await;
     let server = run(listener, pool.clone()).expect("Failed to bind address!");
 
     // Launch as a background task
@@ -119,19 +122,25 @@ async fn spawn_app() -> TestApp {
     }
 }
 
-pub async fn configure_database(config: &DatabaseSettings) -> PgPool {
-    let mut connection =
-        PgConnection::connect(config.connection_string_without_db().expose_secret())
-            .await
-            .expect("Failed to connect to postgres");
+pub async fn configure_database(pg_options: PgConnectOptions) -> PgPool {
+    let options_without_db = pg_options.clone().database("");
+    let mut connection = PgConnection::connect_with(&options_without_db)
+        .await
+        .expect("Failed to connect to postgres");
     connection
-        .execute(format!(r#"CREATE DATABASE {}"#, &config.database_name).as_str())
+        .execute(
+            format!(
+                r#"CREATE DATABASE {}"#,
+                &pg_options
+                    .get_database()
+                    .expect("Expect db name to be present!")
+            )
+            .as_str(),
+        )
         .await
         .expect("Failed to create database.");
 
-    let pool = PgPool::connect(config.connection_string().expose_secret())
-        .await
-        .expect("Failed to create PgPool");
+    let pool = PgPoolOptions::new().connect_lazy_with(pg_options);
     sqlx::migrate!("./migrations")
         .run(&pool)
         .await

@@ -19,6 +19,7 @@ rand = "0.8.5"
 reqwest = "0.12.5"
 secrecy = { version = "0.8.0", features = ["serde"] }
 serde = { version = "1", features = ["derive"] }
+serde-aux = "4.5.0"
 tokio = { version = "1", features = ["rt", "rt-multi-thread"] }
 tokio-macros = "2.2.0"
 tracing = { version = "0.1.40", features = ["log"] }
