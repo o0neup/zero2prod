@@ -70,6 +70,36 @@ async fn subscribe_returns_200_for_valid_form_data() {
 }
 
 #[tokio_macros::test]
+async fn subscribe_returns_400_for_invalid_form_data() {
+    let test_app = spawn_app().await;
+    let client = reqwest::Client::new();
+
+    let test_cases = vec![
+        ("name=[kotleta]&email=2hcompany%40gmail.com", "invalid name"),
+        (
+            "name=DROP TABLE subscriptions;&email=2hcompany%40gmail.com",
+            "invalid name",
+        ),
+    ];
+    for (body, _error) in test_cases {
+        let response = client
+            .post(&format!("http://{}/subscriptions", &test_app.address))
+            .header("Content-Type", "application/x-www-form-urlencoded")
+            .body(body)
+            .send()
+            .await
+            .expect("Failed to execute request.");
+
+        assert_eq!(
+            400,
+            response.status().as_u16(),
+            "The API didn't fail with 400 Bad Request when the payload was {}",
+            body
+        );
+    }
+}
+
+#[tokio_macros::test]
 async fn subscribe_returns_400_when_data_is_missing() {
     let test_app = spawn_app().await;
     let client = reqwest::Client::new();
@@ -104,10 +134,12 @@ async fn spawn_app() -> TestApp {
     let configuration = get_configuration().expect("Failed to fetch configuration!");
     let test_db_name = rand::thread_rng()
         .sample_iter(&Alphanumeric)
+        .filter(|c| !c.is_ascii_digit())
         .take(10)
         .map(char::from)
         .collect::<String>()
-        .to_lowercase();
+        .to_lowercase()
+        .replace("-", "_");
     let options_for_test = configuration.database_url.0.database(&test_db_name);
     let pool = configure_database(options_for_test).await;
     let server = run(listener, pool.clone()).expect("Failed to bind address!");
@@ -138,7 +170,14 @@ pub async fn configure_database(pg_options: PgConnectOptions) -> PgPool {
             .as_str(),
         )
         .await
-        .expect("Failed to create database.");
+        .unwrap_or_else(|_| {
+            panic!(
+                "Failed to create database {}.",
+                &pg_options
+                    .get_database()
+                    .expect("Expect db name to be present!")
+            )
+        });
 
     let pool = PgPoolOptions::new().connect_lazy_with(pg_options);
     sqlx::migrate!("./migrations")
