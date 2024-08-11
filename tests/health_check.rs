@@ -170,10 +170,14 @@ pub async fn configure_database(pg_options: PgConnectOptions) -> PgPool {
             .as_str(),
         )
         .await
-        .unwrap_or_else(|_| panic!("Failed to create database {}.",
-            &pg_options
-                .get_database()
-                .expect("Expect db name to be present!")));
+        .unwrap_or_else(|_| {
+            panic!(
+                "Failed to create database {}.",
+                &pg_options
+                    .get_database()
+                    .expect("Expect db name to be present!")
+            )
+        });
 
     let pool = PgPoolOptions::new().connect_lazy_with(pg_options);
     sqlx::migrate!("./migrations")
