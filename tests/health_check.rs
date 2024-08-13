@@ -7,6 +7,7 @@ use sqlx::{
 use std::net::TcpListener;
 use zero2prod::{
     configuration::get_configuration,
+    email_client::{self, EmailClient},
     startup::run,
     telemetry::{get_subscriber, init_subscriber},
 };
@@ -141,8 +142,13 @@ async fn spawn_app() -> TestApp {
         .to_lowercase()
         .replace("-", "_");
     let options_for_test = configuration.database_url.0.database(&test_db_name);
+    let sender_email = configuration
+        .email_client
+        .sender()
+        .expect("Invalid sender email");
+    let email_client = EmailClient::new(configuration.email_client.base_url, sender_email);
     let pool = configure_database(options_for_test).await;
-    let server = run(listener, pool.clone()).expect("Failed to bind address!");
+    let server = run(listener, pool.clone(), email_client).expect("Failed to bind address!");
 
     // Launch as a background task
     // tokio::spawn returns a handle to the spawned future,
