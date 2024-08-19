@@ -29,10 +29,6 @@ impl Application {
             timeout,
             settings.email_client.auth_token,
         );
-        sqlx::migrate!("./migrations")
-            .run(&pool)
-            .await
-            .unwrap_or_else(|e| panic!("Failed to apply migrations: {}", e));
         let listener = TcpListener::bind(&format!(
             "{}:{}",
             settings.application.host, settings.application.port
