@@ -1,2 +1,6 @@
 application:
   host: "0.0.0.0"
+  base_url: "https://zero2prod-bitter-moon-129.fly.dev"
+email_client:
+  base_url: "https://api.postmarkapp.com"
+  sender_email: "yo@privetartyomka.com"
