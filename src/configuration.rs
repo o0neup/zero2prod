@@ -1,28 +1,32 @@
 use std::str::FromStr;
 
+use secrecy::Secret;
 use serde::{de, Deserialize};
 use serde_aux::field_attributes::deserialize_number_from_string;
 use sqlx::postgres::PgConnectOptions;
+use std::time::Duration;
 
 use crate::domain::SubscriberEmail;
 
-#[derive(Debug, serde::Deserialize)]
+#[derive(Debug, serde::Deserialize, Clone)]
 pub struct ApplicationSettings {
     pub host: String,
     #[serde(deserialize_with = "deserialize_number_from_string")]
     pub port: u16,
 }
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub struct DbOptions(pub PgConnectOptions);
 
-#[derive(Debug, serde::Deserialize)]
+#[derive(Debug, serde::Deserialize, Clone)]
 pub struct EmailClientSettings {
     pub base_url: String,
     pub sender_email: String,
+    pub timeout_milliseconds: u64,
+    pub auth_token: Secret<String>,
 }
 
-#[derive(Debug, serde::Deserialize)]
+#[derive(Debug, serde::Deserialize, Clone)]
 pub struct Settings {
     pub database_url: DbOptions,
     pub application: ApplicationSettings,
@@ -50,6 +54,10 @@ impl<'de> Deserialize<'de> for DbOptions {
 impl EmailClientSettings {
     pub fn sender(&self) -> Result<SubscriberEmail, String> {
         SubscriberEmail::parse(self.sender_email.clone())
+    }
+
+    pub fn timeout(&self) -> Duration {
+        Duration::from_millis(self.timeout_milliseconds)
     }
 }
 
